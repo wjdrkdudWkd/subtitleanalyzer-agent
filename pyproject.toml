@@ -1,0 +1,36 @@
+[project]
+name = "subtitleanalyzer-agent"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "jeonggayoung",email = "wjdrkdudWkd@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "langchain-openai (>=1.1.9,<2.0.0)",
+    "langgraph (>=1.0.8,<2.0.0)",
+    "python-dotenv (>=1.2.1,<2.0.0)",
+    "pydantic (>=2.12.5,<3.0.0)",
+    "asyncio (>=4.0.0,<5.0.0)",
+    "load-dotenv (>=0.1.0,<0.2.0)"
+]
+
+[tool.poetry]
+name = "subtitleanalyzer-agent"
+version = "0.1.0"
+description = "AI Agent for subtitle analysis"
+authors = ["wjdrkdudWkd@gmail.com"]
+package-mode = true
+
+# 이 부분이 핵심입니다!
+# "app" 폴더 안에 있는 내용들을 "subtitleanalyzer_agent"라는 이름의 패키지로 취급해줘
+packages = [{include = "app"}]
+
+[tool.poetry.dependencies]
+python = ">=3.13,<4.0"  # 이 부분을 수정: 3.13 이상이되 4.0 미만임을 명시
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
