@@ -1,0 +1,51 @@
+# --- Python Standard ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- Virtual Environments (Poetry & venv) ---
+.venv/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Environment Variables (CRITICAL!) ---
+.env
+.env.local
+.env.*
+.secrets
+
+# --- IDEs & Editors ---
+.idea/             # PyCharm 설정 파일
+.vscode/           # VS Code 설정 파일
+*.swp
+*.swo
+.DS_Store          # macOS 전용
+
+# --- AI/Data Specific ---
+data/*.srt         # 원본 데이터는 유출 방지를 위해 제외 (필요시)
+data/*.vtt
+*.log              # 실행 로그
+.langsmith         # LangSmith 설정 파일 (사용 시)
+
+# --- Poetry ---
+# poetry.lock은 커밋하는 것이 권장됩니다 (Gradle의 lock 파일과 같은 역할)
