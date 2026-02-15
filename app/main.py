@@ -13,8 +13,8 @@ async def main():
     # 2. 테스트용 입력 데이터 (자막의 일부)
     initial_state = {
         "subtitle_raw": (
-            "The backend developer is working on a Spring Boot application. "
-            "It is important to manage dependencies efficiently to avoid conflicts."
+            "すごいわ　カルシファー！ あなたは一流よ！"
+            "心臓！　心臓があるのかい？"
         ),
         "retry_count": 0
     }

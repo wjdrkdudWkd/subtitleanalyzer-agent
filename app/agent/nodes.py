@@ -1,8 +1,12 @@
 # app/agent/nodes.py
+from pydantic import Field
+
+from langchain_core.output_parsers import JsonOutputParser
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
-from .state import AgentState
+from pydantic import BaseModel
 
+from .state import AgentState
 
 def extract_words(state: AgentState):
     """
@@ -28,6 +32,39 @@ def extract_words(state: AgentState):
 
     # 5. 상태 업데이트 (Java의 setter 느낌)
     return {"selected_words": words, "retry_count": 0}
+
+
+# 1. AI 응답 형식을 강제하기 위한 스키마 (Java의 DTO와 유사)
+class WordDetail(BaseModel):
+    word: str = Field(description="단어")
+    meaning: str = Field(description="자막 문맥에 맞는 한국어 뜻")
+    example: str = Field(description="해당 단어를 사용한 새로운 예문")
+
+
+def generate_content(state: AgentState):
+    """
+    추출된 단어들의 문맥상 의미를 파악하고 학습 콘텐츠를 생성합니다.
+    """
+    print("---단어장 콘텐츠 생성 중---")
+
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.7)  # 생성 시에는 약간의 창의성 허용
+    parser = JsonOutputParser(pydantic_object=WordDetail)
+
+    # 2. 문맥 중심 프롬프트 설계
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", "너는 전문 언어 튜터야. 주어진 자막 문맥을 바탕으로 단어의 뜻을 풀이해줘. 반드시 JSON 형식으로 답해야 해.\n{format_instructions}"),
+        ("user", "자막 내용: {subtitle_raw}\n\n추출된 단어들: {selected_words}\n\n위 단어들에 대해 자막의 흐름에 맞는 뜻과 새로운 예문을 만들어줘.")
+    ]).partial(format_instructions=parser.get_format_instructions())
+
+    # 3. 체인 실행
+    chain = prompt | llm | parser
+    results = chain.invoke({
+        "subtitle_raw": state["subtitle_raw"],
+        "selected_words": state["selected_words"]
+    })
+
+    # 4. 상태 업데이트
+    return {"word_entries": results if isinstance(results, list) else [results]}
 
 
 def validate_result(state: AgentState):
