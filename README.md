@@ -2,7 +2,7 @@
 
 > **LLM 에이전트 기반 문맥 최적화 자막 분석 및 학습 콘텐츠 생성 파이프라인**
 
-본 프로젝트는 외국어 콘텐츠의 자막을 분석하여 학습자에게 최적화된 단어장과 창의적인 예문을 제공하는 AI 에이전트 시스템입니다. (아직 일본어만 지원) 기존 **[Spring-based Subtitle Analyzer](https://github.com/wjdrkdudWkd/subtitleanalyzer)**의 비즈니스 로직을 계승하면서, LLM의 추론 능력을 극대화할 수 있는 **Python/LangChain** 기반의 에이전트 구조로 재설계되었습니다.
+본 프로젝트는 외국어 콘텐츠의 자막을 분석하여 학습자에게 최적화된 단어장과 창의적인 예문을 제공하는 AI 에이전트 시스템입니다. (아직 일본어만 지원) 기존 **[Spring-based Subtitle Analyzer](https://github.com/wjdrkdudWkd/subtitleanalyzer)** 의 비즈니스 로직을 계승하면서, LLM의 추론 능력을 극대화할 수 있는 **Python/LangChain** 기반의 에이전트 구조로 재설계되었습니다.
 
 ---
 
