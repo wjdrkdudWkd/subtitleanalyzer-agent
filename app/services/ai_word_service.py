@@ -10,8 +10,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from sqlmodel import Session, select
-from app.models import WordEntry, JapaneseWordMetadata, WordLearningContent, SubtitleSentence
-from app.schemas import AIWordEnhanceResponseV2
+from app.models import WordEntry, JapaneseWordMetadata, WordLearningContent, SubtitleSentence, ExampleSentence, \
+    ExampleTranslation, SubtitleTranslation
+from app.schemas import AIWordEnhanceResponseV2, AIWordEnhanceResponseV4
 
 load_dotenv()
 
@@ -37,12 +38,31 @@ PROMPT_V2 = """
 {payload}
 """
 
+PROMPT_V3 = """
+너는 글로벌 일본어 교육 전문가이자 전문 번역가야. 
+제공된 데이터를 바탕으로 다국어 학습 콘텐츠를 생성해줘.
+
+[수행 과제]
+1. Context Translation: 제공된 `contexts` 리스트의 모든 문장을 한국어로 정확하게 번역해.
+2. Word Definition: 각 단어의 의미를 contexts 문맥에 맞게 풀이해.
+3. Creative Example: `word_groups`의 단어들을 활용해 저작권 없는 고유한 새 문장을 창작하고 해석을 달아줘.
+
+[절대 규칙]
+- 원본 자막을 그대로 예문으로 쓰지 마라.
+- 모든 `word_id`와 `context_id`를 정확히 매칭하여 리턴해라.
+
+{format_instructions}
+
+[입력 데이터]
+{payload}
+"""
+
 
 class AIWordService:
     def __init__(self):
         self.llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
-        self.parser = PydanticOutputParser(pydantic_object=AIWordEnhanceResponseV2)
-        self.prompt = ChatPromptTemplate.from_template(PROMPT_V2)
+        self.parser = PydanticOutputParser(pydantic_object=AIWordEnhanceResponseV4)
+        self.prompt = ChatPromptTemplate.from_template(PROMPT_V3)
         self.semaphore = asyncio.Semaphore(3)  # 동시 실행 제한
 
     def _chunk_list(self, lst, n):
@@ -134,11 +154,15 @@ class AIWordService:
         """chunk 내부의 단어들을 문장별로 섞어 그룹화"""
         unique_contexts = {}
         sentence_buckets = defaultdict(list)
+        # {simple_id: db_id} 역매핑용 딕셔너리
+        id_mapping = {}
         context_counter = 1
 
         for word, sentence_id, sentence_text in chunk:
             if sentence_id not in unique_contexts:
                 unique_contexts[sentence_id] = {"id": context_counter, "text": sentence_text}
+                # 역매핑 정보 저장
+                id_mapping[context_counter] = sentence_id
                 context_counter += 1
 
             sentence_buckets[sentence_id].append({
@@ -161,7 +185,10 @@ class AIWordService:
                 "words": interleaved[i: i + 3]
             })
 
-        return {"contexts": list(unique_contexts.values()), "word_groups": word_groups}
+        return {
+            "payload": {"contexts": list(unique_contexts.values()), "word_groups": word_groups},
+            "context_mapping": id_mapping  # 이 정보가 저장 시 필요함
+        }
 
 
     async def enhance_words_v2(self, session: Session, results: List[tuple]):
@@ -187,52 +214,53 @@ class AIWordService:
             logger.error(f"AI 처리 중 오류 발생: {e}")
             return None
 
-    def _save_results(self, session: Session, chunk: List[tuple], ai_data: AIWordEnhanceResponseV2):
+    def _save_results(self, session: Session, chunk: List[tuple], ai_data: Any, context_mapping: Dict[int, int]):
         word_entry_map = {word.id: word for word, _, _ in chunk}
-
-        # 1. 현재 배치에 포함된 WordEntry 객체들을 ID 기반 Map으로 변환
-        word_entry_map = {word.id: word for word, _, _ in chunk}
-
-        # 2. AI가 응답한 예문들을 word_id 기반으로 역매핑 (중요!)
-        # 어떤 word_id가 어떤 예문을 가져야 하는지 Map 생성
-        # {word_id: GroupedExample}
-        word_to_example_map = {}
-        for ex in ai_data.examples:
-            for w_id in ex.word_ids:
-                word_to_example_map[w_id] = ex
-
         success_count = 0
 
-        # 3. AI 응답 데이터 순회 및 DB 반영
+        # 1. 원본 자막 번역 저장 (SubtitleTranslation)
+        for trans in ai_data.subtitle_translations:
+            db_sentence_id = context_mapping.get(trans.context_id)
+            if db_sentence_id:
+                new_sub_trans = SubtitleTranslation(
+                    subtitle_sentence_id=db_sentence_id,
+                    language_code="ko",
+                    translated_text=trans.translation_ko
+                )
+                session.add(new_sub_trans)
+
+        # 2. 예문 데이터 처리 (ExampleSentence & Translation)
+        created_example_ids = {}
+        for ex in ai_data.examples:
+            new_example = ExampleSentence(group_id=ex.group_id, sentence_text=ex.new_sentence_ja)
+            session.add(new_example)
+            session.flush()  # ID 확보
+
+            created_example_ids[ex.group_id] = new_example.id
+            session.add(ExampleTranslation(
+                example_id=new_example.id,
+                language_code="ko",
+                translated_text=ex.new_sentence_ko
+            ))
+
+        # 3. 단어별 메타데이터 및 학습 콘텐츠 매핑
         for def_res in ai_data.word_definitions:
-            word_id = def_res.word_id
-            word_entry = word_entry_map.get(word_id)
+            word_entry = word_entry_map.get(def_res.word_id)
+            if not word_entry: continue
 
-            if not word_entry:
-                logger.warning(f"⚠️ AI가 보낸 word_id {word_id}를 현재 배치에서 찾을 수 없습니다.")
-                continue
-
-            # [A] 메타데이터 업데이트 (JapaneseWordMetadata)
             word_entry.japanese_metadata.reading = def_res.reading
             word_entry.japanese_metadata.jlpt_level = def_res.jlpt_level
 
-            # [B] 학습 콘텐츠 저장 (WordLearningContent)
-            # 역매핑된 맵에서 해당 단어의 예문을 찾아옴
-            matching_ex = word_to_example_map.get(word_id)
-
-            if matching_ex:
-                content = WordLearningContent(
+            target_group_id = next((ex.group_id for ex in ai_data.examples if def_res.word_id in ex.word_ids), None)
+            if target_group_id in created_example_ids:
+                session.add(WordLearningContent(
                     word_entry_id=word_entry.id,
+                    example_id=created_example_ids[target_group_id],
                     meaning=def_res.meaning,
                     usage_tip=f"JLPT {def_res.jlpt_level} 수준",
-                    generated_example={
-                        "ja": matching_ex.new_sentence_ja,
-                        "ko": matching_ex.new_sentence_ko
-                    }
-                )
-                session.add(content)
+                    language_code="ko"
+                ))
                 success_count += 1
-
         return success_count
 
     async def enhance_words_hybrid(self, session: Session, subtitle_id: int, batch_size: int = 15):

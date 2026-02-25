@@ -3,7 +3,7 @@ from fastapi.params import Depends, Form, File
 from sqlmodel import Session
 
 from app.database import get_session
-from app.services.ai_word_service import AIWordService
+from app.services.ai_word_serviceV2 import AIWordService
 from app.services.subtitle_service import SubtitleService
 from app.services.word_service import WordService
 from app.models import create_db_and_tables
