@@ -231,7 +231,7 @@ class AIWordService:
 
         # 1. 매핑 준비: AI의 가상 context_id -> 실제 DB sentence_id
         # SentenceTaskDTO 구조 덕분에 아주 쉽게 맵을 만듭니다.
-        context_id_map = {idx + 1: task.sentence_id for idx, task in enumerate(chunk)}
+        context_id_map = {task.sentence_id: task.sentence_id for task in chunk}
 
         # 2. 단어 객체 맵핑 (Update용)
         # 이번 배치에 포함된 모든 단어 ID 리스트를 추출해서 맵핑
