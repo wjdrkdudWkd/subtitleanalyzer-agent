@@ -45,6 +45,7 @@ class SubtitleSentence(SQLModel, table=True):
 
     # 🔍 벡터 검색을 위한 임베딩 데이터
     embedding: Optional[List[float]] = Field(default=None, sa_column=Column(JSON))
+    created_at: datetime = Field(default_factory=datetime.now)
 
     # 관계 설정
     subtitle: "Subtitle" = Relationship(back_populates="sentences")
@@ -65,6 +66,8 @@ class WordEntry(SQLModel, table=True):
     is_valid: bool = Field(default=True, index=True)  # 필터링용 인덱스 추가
     skip_reason: Optional[str] = None  # 왜 제외되었는지 기록 (디버깅용)
 
+    created_at: datetime = Field(default_factory=datetime.now)
+
     subtitle: Subtitle = Relationship(back_populates="word_entries")
     learning_content: Optional["WordLearningContent"] = Relationship(back_populates="word_entry")
 
@@ -82,6 +85,7 @@ class JapaneseWordMetadata(SQLModel, table=True):
 
     reading: Optional[str] = None  # 히라가나/가타카나 읽기
     jlpt_level: Optional[str] = Field(default=None, max_length=2)  # N1 ~ N5
+    created_at: datetime = Field(default_factory=datetime.now)
 
     word_entry: WordEntry = Relationship(back_populates="japanese_metadata")
 
@@ -98,6 +102,7 @@ class WordLearningContent(SQLModel, table=True):
     language_code: str = Field(default="ko", index=True)  # 뜻의 언어 (글로벌 대응)
     usage_tip: Optional[str] = None
     model_name: str = Field(default="gpt-4o-mini")
+    created_at: datetime = Field(default_factory=datetime.now)
 
     word_entry: "WordEntry" = Relationship(back_populates="learning_content")
     example: Optional["ExampleSentence"] = Relationship(back_populates="word_contents")
@@ -118,6 +123,7 @@ class SubtitleTranslation(SQLModel, table=True):
 
     language_code: str = Field(index=True, max_length=10)  # ko, en, zh 등
     translated_text: str = Field(max_length=1000, nullable=False)
+    created_at: datetime = Field(default_factory=datetime.now)
 
     sentence: "SubtitleSentence" = Relationship(back_populates="translations")
 
@@ -140,6 +146,7 @@ class ExampleTranslation(SQLModel, table=True):
 
     language_code: str = Field(index=True, max_length=10)  # ko, en 등
     translated_text: str = Field(max_length=1000, nullable=False)
+    created_at: datetime = Field(default_factory=datetime.now)
 
     example: ExampleSentence = Relationship(back_populates="translations")
 
